@@ -886,17 +886,21 @@ function getRawPv(d,i){return parseInt((S.pv[d]&&S.pv[d][i])||0)||0;}
    결과: 월요일 = 금+토+일, 공휴일 낀 날 = 공휴일+전날 합산
 ──────────────────────────────────────────────────────────────── */
 function getPv(d,i){
+  // 주말·휴무일 자체는 표시 안 함
+  var self=new Date(d);
+  var selfDow=self.getDay();
+  if(selfDow===0||selfDow===6||S.cl[d]) return 0;
+
   var total=0;
   var cur=new Date(d);
-  var MAX_DAYS=14; // 무한루프 방지
+  var MAX_DAYS=14;
   for(var step=0; step<MAX_DAYS; step++){
-    cur.setDate(cur.getDate()-1); // 하루 전으로
+    cur.setDate(cur.getDate()-1);
     var key=fmtDate(cur);
     total += getRawPv(key,i);
-    var dow=cur.getDay(); // 0=일,6=토
+    var dow=cur.getDay();
     var isWeekend=(dow===0||dow===6);
     var isHoliday=!!S.cl[key];
-    // 주말이거나 휴무면 계속 역산, 정상 영업일이면 중단
     if(!isWeekend && !isHoliday) break;
   }
   return total;
