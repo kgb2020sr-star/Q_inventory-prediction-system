@@ -525,6 +525,14 @@ textarea{resize:vertical;min-height:50px;}
 .nfb.on{background:var(--accent);color:#fff;border-color:transparent;}
 .nfb-all{background:var(--glass-bg-strong);border-color:rgba(0,0,0,0.12);}
 .nfb-all.on{background:#0f172a;color:#fff;border-color:transparent;}
+
+/* ── mets2 추가 스타일 ── */
+.met2-miss-click{cursor:pointer;transition:opacity .12s;}
+.met2-miss-click:hover{opacity:.7;}
+.mets2-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.mets2-nav-btn{background:none;border:1px solid rgba(0,0,0,0.1);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;font-family:inherit;color:var(--t2);transition:all .12s;}
+.mets2-nav-btn:hover{background:var(--glass-bg-dark);color:var(--tx);}
+.mets2-nav-title{font-size:11px;font-weight:700;}
 </style>
 </head>
 <body>
@@ -1171,11 +1179,38 @@ function _met(label,val,color){
   var c=(typeof val==='number'&&val>0&&color)?'color:'+color+';':'';
   return '<div class="met2"><div class="ml">'+label+'</div><div class="mv" style="'+c+'font-size:15px">'+v+'</div></div>';
 }
-function _metN(label,nicks,color){
-  var arr=Array.isArray(nicks)?nicks:Object.keys(nicks);
-  var txt=arr.length?arr.join(' · '):'—';
-  var c=arr.length?'color:'+color+';font-size:11px;letter-spacing:.04em;line-height:1.4':'color:#94a3b8;font-size:11px';
-  return '<div class="met2 span2"><div class="ml">'+label+'</div><div class="mv" style="'+c+'">'+txt+'</div></div>';
+function _metN(label,nicks,color,misMap){
+  // nicks: 배열(닉네임) or 객체(닉:수량)
+  var isMap=!Array.isArray(nicks);
+  var arr=isMap?Object.keys(nicks):nicks;
+  var txt,copyTxt;
+  if(arr.length){
+    if(isMap){
+      txt=arr.map(function(n){return n+'('+nicks[n]+')';}).join(', ');
+    } else if(misMap){
+      txt=arr.map(function(n){return n+'('+(misMap[n]||0)+')';}).join(', ');
+    } else {
+      txt=arr.join(', ');
+    }
+    copyTxt=txt;
+  } else {
+    txt='—'; copyTxt='';
+  }
+  var col=arr.length?'color:'+color+';font-size:11px;letter-spacing:.02em;line-height:1.5':'color:#94a3b8;font-size:11px';
+  var copyAttr=copyTxt?'class="met2-miss-click" onclick="_copyMiss(\''+copyTxt.replace(/'/g,"\\'")+'\',this)" title="클릭하면 복사"':'';
+  return '<div class="met2 span2"><div class="ml">'+label+'</div><div class="mv '+copyAttr+'" style="'+col+'">'+txt+'</div></div>';
+}
+
+function moveMetsDay(dir){METS_DAY_OFFSET+=dir;rWeekly();}
+function moveMetsWk(dir){METS_WK_OFFSET+=dir;rWeekly();}
+function _copyMiss(txt,el){
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(txt).then(function(){
+      var orig=el.textContent;
+      el.textContent='✅ 복사됨!';
+      setTimeout(function(){el.textContent=orig;},1500);
+    });
+  }
 }
 function rWeekly(){
   var mon=S.ws,days=[];
@@ -1183,52 +1218,72 @@ function rWeekly(){
   el('wk-title').textContent='2026년 '+(mon.getMonth()+1)+'월 '+getWkNum(mon)+'주차';
   var DNs=['월','화','수','목','금','토','일'],todayK=fmtDate(new Date());
   /* ── wk-mets 2카드 계산 ── */
-  var today=fmtDate(new Date());
-  var mo=S.ws.getMonth()+1, wn=getWkNum(S.ws);
+  var baseToday=new Date();
+  baseToday.setDate(baseToday.getDate()+METS_DAY_OFFSET);
+  var today=fmtDate(baseToday);
+  var todayLabel=METS_DAY_OFFSET===0?'금일':(METS_DAY_OFFSET<0?(-METS_DAY_OFFSET)+'일 전':(METS_DAY_OFFSET)+'일 후');
+
+  // 이번주 오프셋
+  var wkBase=new Date(S.ws);
+  wkBase.setDate(wkBase.getDate()+METS_WK_OFFSET*7);
+  var wkDays=[];for(var wi=0;wi<7;wi++){var wd=new Date(wkBase);wd.setDate(wd.getDate()+wi);wkDays.push(wd);}
+  var mo=wkBase.getMonth()+1, wn=getWkNum(wkBase);
+  var wkLabel=METS_WK_OFFSET===0?'이번주':(METS_WK_OFFSET<0?(-METS_WK_OFFSET)+'주 전':(METS_WK_OFFSET)+'주 후');
 
   // 금일
-  var tdFc=0,tdPv=0,tdMax=0,tdFin=0,tdMis=0,tdMisNicks=[];
+  var tdFc=0,tdPv=0,tdMax=0,tdFin=0,tdMis=0,tdMisMap={};
   ITEM_NICK.forEach(function(it){
-    var f=getFc(today,it),pv=getPv(today,it),mx=getMx(today,it),ac=getAc(today,it),mis=Math.max(0,mx-ac);
+    var f=getFc(today,it),pv=getPv(today,it),mx=getMx(today,it),ac=getAc(today,it);
+    var rawAc=parseInt((S.ac[today]&&S.ac[today][it])||0)||0;
+    var rawMx=getRawMx(today,it);
+    var mis=(rawMx&&rawAc)?Math.max(0,mx-ac):0;
     tdFc+=f; tdPv+=pv; tdMax+=mx; tdFin+=ac; tdMis+=mis;
-    if(mis>0) tdMisNicks.push(it);
+    if(mis>0) tdMisMap[it]=mis;
   });
 
   // 이번주
   var sf=0,spv=0,wkMax=0,sa=0,sm=0,wkMisMap={};
-  days.forEach(function(d){
+  wkDays.forEach(function(d){
     var k=fmtDate(d);
     ITEM_NICK.forEach(function(it){
       var f=getFc(k,it),pv=getPv(k,it),mx=getMx(k,it),ac=getAc(k,it),mis=Math.max(0,mx-ac);
       sf+=f; spv+=pv; wkMax+=mx; sa+=ac; sm+=mis;
-      if(mis>0) wkMisMap[it]=1;
+      if(mis>0) wkMisMap[it]=(wkMisMap[it]||0)+mis;
     });
   });
 
   // 금일 카드
   var todayCard=
     '<div class="mets2-card mets2-today">'+
-    '<div class="mets2-label">금일 <span style="font-size:10px;opacity:.6">'+today+'</span></div>'+
+    '<div class="mets2-nav">'+
+    '<button class="mets2-nav-btn" onclick="moveMetsDay(-1)">◀</button>'+
+    '<span class="mets2-nav-title mets2-today" style="color:var(--red);">'+todayLabel+' <span style="font-size:10px;opacity:.6;font-weight:400;">'+today+'</span></span>'+
+    '<button class="mets2-nav-btn" onclick="moveMetsDay(1)">▶</button>'+
+    '</div>'+
     '<div class="mets2-grid">'+
     _met('예측',tdFc,null)+
     _met('전일',tdPv,'var(--purple)')+
     _met('출고최대',tdMax,'var(--orange)')+
     _met('최종출고가능',tdFin,'var(--green)')+
     _met('미출',tdMis,'var(--red)')+
-    _metN('미출 품목',tdMisNicks,'var(--red)')+
+    _metN('미출 품목',tdMisMap,'var(--red)')+
     '</div></div>';
 
   // 이번주 카드
   var weekCard=
     '<div class="mets2-card mets2-week">'+
-    '<div class="mets2-label">이번주 <span style="font-size:10px;opacity:.6">'+mo+'월 '+wn+'주차</span></div>'+
+    '<div class="mets2-nav">'+
+    '<button class="mets2-nav-btn" onclick="moveMetsWk(-1)">◀</button>'+
+    '<span class="mets2-nav-title" style="color:var(--accent);">'+wkLabel+' <span style="font-size:10px;opacity:.6;font-weight:400;">'+mo+'월 '+wn+'주차</span></span>'+
+    '<button class="mets2-nav-btn" onclick="moveMetsWk(1)">▶</button>'+
+    '</div>'+
     '<div class="mets2-grid">'+
     _met('예측',sf,null)+
     _met('전일',spv,'var(--purple)')+
     _met('출고최대',wkMax,'var(--orange)')+
     _met('최종출고가능',sa,'var(--green)')+
     _met('미출',sm,'var(--red)')+
-    _metN('미출 품목',Object.keys(wkMisMap),'var(--red)')+
+    _metN('미출 품목',wkMisMap,'var(--red)')+
     '</div></div>';
 
   el('wk-mets').innerHTML='<div class="mets2-wrap">'+todayCard+weekCard+'</div>';
@@ -1335,9 +1390,9 @@ document.addEventListener('change',function(e){
   var obj={fc:S.fc,pv:S.pv,mx:S.mx,ac:S.ac}[t];
   if(!obj)return;if(!obj[k])obj[k]={};if(!num)delete obj[k][i];else obj[k][i]=num;
   // 미출 변경 시 mets만 빠르게 업데이트
-  var _today=fmtDate(new Date());
+  var _base=new Date();_base.setDate(_base.getDate()+METS_DAY_OFFSET);var _today=fmtDate(_base);
   var _tdFc=0,_tdPv=0,_tdMax=0,_tdFin=0,_tdMis=0,_tdMisNicks=[];
-  ITEM_NICK.forEach(function(it){var f=getFc(_today,it),pv=getPv(_today,it),mx=getMx(_today,it),ac=getAc(_today,it),mis=Math.max(0,mx-ac);_tdFc+=f;_tdPv+=pv;_tdMax+=mx;_tdFin+=ac;_tdMis+=mis;if(mis>0)_tdMisNicks.push(it);});
+  ITEM_NICK.forEach(function(it){var f=getFc(_today,it),pv=getPv(_today,it),mx=getMx(_today,it),ac=getAc(_today,it);var _rAc=parseInt((S.ac[_today]&&S.ac[_today][it])||0)||0;var _rMx=getRawMx(_today,it);var mis=(_rMx&&_rAc)?Math.max(0,mx-ac):0;_tdFc+=f;_tdPv+=pv;_tdMax+=mx;_tdFin+=ac;_tdMis+=mis;if(mis>0)_tdMisNicks.push(it);});
   var _sf=0,_spv=0,_wkMax=0,_sa=0,_sm=0,_wkMisMap={};
   var _mon=S.ws;
   for(var _x=0;_x<7;_x++){var _d=new Date(_mon);_d.setDate(_d.getDate()+_x);var _ky=fmtDate(_d);
@@ -1956,6 +2011,8 @@ function openDrawer(dateKey){
 
 
 var DRAWER_SHOW={fc:true,pv:true,max:true,ac:true,mis:true};
+var METS_DAY_OFFSET=0; // 금일 카드 날짜 오프셋
+var METS_WK_OFFSET=0;  // 이번주 카드 주 오프셋
 function drawerToggle(type){
   DRAWER_SHOW[type]=!DRAWER_SHOW[type];
   var btn=document.getElementById('dwr-'+type);
