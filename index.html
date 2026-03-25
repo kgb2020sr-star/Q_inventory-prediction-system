@@ -877,7 +877,30 @@ function getFc(d,i){return parseInt((S.fc[d]&&S.fc[d][i])||0)||0;}
 function getMx(d,i){if(S.mx[d]&&S.mx[d][i]!==undefined)return parseInt(S.mx[d][i])||0;var f=getFc(d,i);return f>0?Math.floor(f*0.967):0;}
 function getAc(d,i){return parseInt((S.ac[d]&&S.ac[d][i])||0)||0;}
 function getMis(d,i){return Math.max(0,getMx(d,i)-getAc(d,i));}
-function getPv(d,i){return parseInt((S.pv[d]&&S.pv[d][i])||0)||0;}
+function getRawPv(d,i){return parseInt((S.pv[d]&&S.pv[d][i])||0)||0;}
+
+/* ── 전일 누적 계산 ──────────────────────────────────────────────
+   오늘(d) 기준으로 하루씩 역산:
+   - 주말(토/일) 또는 휴무일이면 → pv 누적 후 계속
+   - 정상 영업일이면 → pv 누적 후 중단
+   결과: 월요일 = 금+토+일, 공휴일 낀 날 = 공휴일+전날 합산
+──────────────────────────────────────────────────────────────── */
+function getPv(d,i){
+  var total=0;
+  var cur=new Date(d);
+  var MAX_DAYS=14; // 무한루프 방지
+  for(var step=0; step<MAX_DAYS; step++){
+    cur.setDate(cur.getDate()-1); // 하루 전으로
+    var key=fmtDate(cur);
+    total += getRawPv(key,i);
+    var dow=cur.getDay(); // 0=일,6=토
+    var isWeekend=(dow===0||dow===6);
+    var isHoliday=!!S.cl[key];
+    // 주말이거나 휴무면 계속 역산, 정상 영업일이면 중단
+    if(!isWeekend && !isHoliday) break;
+  }
+  return total;
+}
 
 
 /* ─ 컬럼 편집 토글 ─ */
