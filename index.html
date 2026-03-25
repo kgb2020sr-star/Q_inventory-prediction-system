@@ -1285,7 +1285,7 @@ function rWeekly(){
         acC +='<td class="'+cc+acWarn+'"><input class="ci ci-ac'+ec+'" data-k="'+key+'" data-i="'+nick+'" data-t="ac" type="text" value="'+(ac||'')+'" placeholder="'+(acWarn?'⚠️':'—')+'"></td>';
         // 5. 미출: mx·ac 둘 다 있으면 계산, 하나라도 없으면 ⚠️, 0이면 초록 0
         var misTd;
-        if(!rawMx||!rawAc){ misTd='<span class="mis-unknown">⚠️</span>'; }
+        if(!rawMx||!rawAc){ misTd='<span class="dash">—</span>'; }
         else if(mis===0){ misTd='<span class="mis-zero">0</span>'; }
         else{ misTd='<span class="mis-num">'+mis+'</span>'; }
         misC+='<td class="'+cc+'">'+misTd+'</td>';
