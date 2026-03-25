@@ -439,13 +439,19 @@ textarea{resize:vertical;min-height:50px;}
 .mo-cl .mo-date{color:var(--red);}
 .mo-evs{display:flex;gap:1px;flex-wrap:wrap;margin-bottom:3px;min-height:14px;}
 .mo-ev{font-size:11px;line-height:1;}
-.mo-nums{display:flex;flex-direction:column;gap:1px;}
-.mo-n{font-size:10.5px;font-weight:700;line-height:1.3;}
+.mo-nums{display:flex;flex-direction:column;gap:2px;}
+/* 상단 가로 행: 예측|전일|최대|출고 */
+.mo-row1{display:flex;align-items:center;gap:0;font-size:9.5px;font-weight:700;line-height:1.3;flex-wrap:nowrap;}
+.mo-row1 .mo-v{min-width:0;flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mo-row1 .mo-sep{color:rgba(0,0,0,0.15);font-size:9px;padding:0 1px;flex-shrink:0;}
 .mo-n-fc{color:var(--accent);}
 .mo-n-pv{color:#0ea5e9;}
 .mo-n-max{color:var(--orange);}
 .mo-n-ac{color:var(--green);}
-.mo-n-mis{color:var(--red);}
+/* 미출 합계 줄 */
+.mo-row-mis{font-size:9.5px;font-weight:700;color:var(--red);line-height:1.3;}
+/* 미출 품목 줄 */
+.mo-row-miss-items{font-size:8.5px;color:var(--red);opacity:.8;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 /* 요약 카드 */
 .mo-sum-wrap{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px;margin-bottom:4px;}
 .mo-sum-card{background:var(--glass-bg-strong);border:1px solid var(--glass-border);border-radius:var(--r);padding:10px 12px;box-shadow:var(--glass-shadow);}
@@ -489,6 +495,36 @@ textarea{resize:vertical;min-height:50px;}
 .sp-item.sp-진행중{color:#1a8a4a;}
 .sp-item.sp-종료{color:#9898a8;}
 .sp-item.sp-보류{color:#c45a10;}
+
+/* ── 강조 표시 ── */
+/* 1. 예측 - 월요일 헤더 강조 */
+.h-mon-fc{background:rgba(58,58,240,0.08)!important;}
+.h-mon-fc .th-dn{color:var(--accent);font-weight:800;}
+.h-mon-fc .th-dd{color:var(--accent);font-weight:700;}
+/* 2. 전일 - 과거 공란 (시트 업뎃 필요) */
+.warn-pv{background:rgba(254,240,138,0.35)!important;}
+/* 3. 최대 - 오늘 공란 */
+.warn-mx{background:rgba(196,90,16,0.08)!important;}
+/* 4. 출고 - 오늘 공란 */
+.warn-ac{background:rgba(26,138,74,0.08)!important;}
+/* 5. 미출 - 계산 불가 */
+.mis-unknown{font-size:12px;color:#f59e0b;padding:2px 3px;display:block;font-weight:700;}
+/* 미출 = 0 */
+.mis-zero{font-size:11px;color:var(--green);padding:2px 3px;display:block;font-weight:700;}
+
+/* ── 품목 필터 패널 ── */
+.nick-filter-wrap{margin-bottom:10px;}
+.nick-filter-header{display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;user-select:none;}
+.nick-filter-header:hover{opacity:.8;}
+.nick-filter-toggle{font-size:14px;font-weight:700;color:var(--t4);margin-left:4px;line-height:1;}
+.nick-filter-body{display:none;padding:8px 0 4px;}
+.nick-filter-body.open{display:block;}
+.nick-filter-row{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:5px;}
+.nfb{padding:3px 9px;border:1px solid rgba(0,0,0,0.08);border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--t2);background:var(--glass-bg-strong);transition:all .12s;}
+.nfb:hover{background:var(--accent-light);color:var(--accent);border-color:rgba(58,58,240,0.2);}
+.nfb.on{background:var(--accent);color:#fff;border-color:transparent;}
+.nfb-all{background:var(--glass-bg-strong);border-color:rgba(0,0,0,0.12);}
+.nfb-all.on{background:#0f172a;color:#fff;border-color:transparent;}
 </style>
 </head>
 <body>
@@ -540,11 +576,55 @@ textarea{resize:vertical;min-height:50px;}
   </div>
   <div class="toggle-bar">
     <span class="toggle-label">표시:</span>
+    <button id="wkp-all" class="tgl" onclick="toggleAllRows(this)" style="background:#0f172a;color:#fff;border-color:transparent;">전체</button>
     <button class="tgl tgl-fc on"  id="wkp-fc"  onclick="toggleRow('fc')">예측물량</button>
     <button class="tgl tgl-pv on"  id="wkp-pv"  onclick="toggleRow('pv')">전일</button>
     <button class="tgl tgl-max on" id="wkp-max" onclick="toggleRow('max')">금일출고최대</button>
     <button class="tgl tgl-ac on"  id="wkp-fin" onclick="toggleRow('ac')">금일최종출고가능</button>
     <button class="tgl tgl-mis on" id="wkp-mis" onclick="toggleRow('mis')">미출물량</button>
+  </div>
+
+  <!-- 품목 필터 -->
+  <div class="nick-filter-wrap">
+    <div class="nick-filter-header" onclick="toggleNickFilterPanel()">
+      <span style="font-size:10px;font-weight:600;color:var(--t4);letter-spacing:.04em;text-transform:uppercase;">품목 표시</span>
+      <span class="nick-filter-toggle" id="nick-filter-icon">▾</span>
+    </div>
+    <div class="nick-filter-body" id="nick-filter-body">
+      <!-- 1행: 전체 + 요거트 + 마시는 -->
+      <div class="nick-filter-row">
+        <button class="nfb nfb-all on" id="nfb-all" onclick="toggleAllNicks(this)">전체</button>
+        <span style="width:1px;background:rgba(0,0,0,0.1);margin:0 4px;"></span>
+        <button class="nfb on" data-nick="플" onclick="toggleNick('플',this)">플</button>
+        <button class="nfb on" data-nick="소" onclick="toggleNick('소',this)">소</button>
+        <button class="nfb on" data-nick="알" onclick="toggleNick('알',this)">알</button>
+        <button class="nfb on" data-nick="말" onclick="toggleNick('말',this)">말</button>
+        <button class="nfb on" data-nick="라" onclick="toggleNick('라',this)">라</button>
+        <button class="nfb on" data-nick="블" onclick="toggleNick('블',this)">블</button>
+        <button class="nfb on" data-nick="애" onclick="toggleNick('애',this)">애</button>
+        <button class="nfb on" data-nick="오" onclick="toggleNick('오',this)">오</button>
+        <button class="nfb on" data-nick="크" onclick="toggleNick('크',this)">크</button>
+        <button class="nfb on" data-nick="카" onclick="toggleNick('카',this)">카</button>
+        <button class="nfb on" data-nick="푸" onclick="toggleNick('푸',this)">푸</button>
+        <button class="nfb on" data-nick="초" onclick="toggleNick('초',this)">초</button>
+        <span style="width:1px;background:rgba(0,0,0,0.1);margin:0 4px;"></span>
+        <button class="nfb on" data-nick="마S" onclick="toggleNick('마S',this)">마S</button>
+        <button class="nfb on" data-nick="마L" onclick="toggleNick('마L',this)">마L</button>
+      </div>
+      <!-- 2행: 토핑 + 굿즈 -->
+      <div class="nick-filter-row">
+        <button class="nfb on" data-nick="블토" onclick="toggleNick('블토',this)">블토</button>
+        <button class="nfb on" data-nick="크토" onclick="toggleNick('크토',this)">크토</button>
+        <button class="nfb on" data-nick="초토" onclick="toggleNick('초토',this)">초토</button>
+        <button class="nfb on" data-nick="딸토" onclick="toggleNick('딸토',this)">딸토</button>
+        <button class="nfb on" data-nick="카토" onclick="toggleNick('카토',this)">카토</button>
+        <span style="width:1px;background:rgba(0,0,0,0.1);margin:0 4px;"></span>
+        <button class="nfb on" data-nick="꿀" onclick="toggleNick('꿀',this)">꿀</button>
+        <button class="nfb on" data-nick="줄자" onclick="toggleNick('줄자',this)">줄자</button>
+        <button class="nfb on" data-nick="파우치" onclick="toggleNick('파우치',this)">파우치</button>
+        <button class="nfb on" data-nick="메이커" onclick="toggleNick('메이커',this)">메이커</button>
+      </div>
+    </div>
   </div>
   <div class="mets" id="wk-mets"></div>
   <div class="card" style="padding:0;">
@@ -580,10 +660,18 @@ textarea{resize:vertical;min-height:50px;}
   </div>
 
   <!-- 날짜 클릭 상세 드로어 -->
-  <div id="mo-drawer" style="display:none;position:fixed;bottom:0;left:220px;right:0;background:var(--glass-bg);backdrop-filter:blur(20px);border-top:1px solid var(--glass-border-subtle);box-shadow:0 -8px 32px rgba(0,0,0,0.1);z-index:80;max-height:55vh;overflow-y:auto;padding:16px 20px;">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+  <div id="mo-drawer" style="display:none;position:fixed;bottom:0;left:220px;right:0;background:var(--glass-bg);backdrop-filter:blur(20px);border-top:1px solid var(--glass-border-subtle);box-shadow:0 -8px 32px rgba(0,0,0,0.1);z-index:80;max-height:60vh;overflow-y:auto;padding:16px 20px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
       <h3 id="mo-drawer-title" style="margin:0;font-size:14px;font-weight:700;color:var(--tx);"></h3>
       <button onclick="closeDrawer()" style="margin-left:auto;background:none;border:none;font-size:18px;cursor:pointer;color:var(--t3);">✕</button>
+    </div>
+    <!-- 표시 버튼 (주간과 동일) -->
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;">
+      <button class="tgl tgl-fc on"  id="dwr-fc"  onclick="drawerToggle('fc')">예측</button>
+      <button class="tgl tgl-pv on"  id="dwr-pv"  onclick="drawerToggle('pv')">전일</button>
+      <button class="tgl tgl-max on" id="dwr-max" onclick="drawerToggle('max')">최대</button>
+      <button class="tgl tgl-ac on"  id="dwr-ac"  onclick="drawerToggle('ac')">출고</button>
+      <button class="tgl tgl-mis on" id="dwr-mis" onclick="drawerToggle('mis')">미출</button>
     </div>
     <div id="mo-drawer-body"></div>
   </div>
@@ -700,6 +788,7 @@ var S={
   sv:[]
 };
 var SHOW={fc:true,pv:true,max:true,ac:true,mis:true};
+var SHOW_NICKS={};ITEM_NICK.forEach(function(n){SHOW_NICKS[n]=true;});
 
 /* ── Google Sheets 품목코드 → 닉네임 매핑 ── */
 var CODE_TO_NICK={
@@ -877,6 +966,7 @@ function getFc(d,i){return parseInt((S.fc[d]&&S.fc[d][i])||0)||0;}
 function getMx(d,i){if(S.mx[d]&&S.mx[d][i]!==undefined)return parseInt(S.mx[d][i])||0;var f=getFc(d,i);return f>0?Math.floor(f*0.967):0;}
 function getAc(d,i){return parseInt((S.ac[d]&&S.ac[d][i])||0)||0;}
 function getMis(d,i){return Math.max(0,getMx(d,i)-getAc(d,i));}
+function getRawMx(d,i){return parseInt((S.mx[d]&&S.mx[d][i])||0)||0;}
 function getRawPv(d,i){return parseInt((S.pv[d]&&S.pv[d][i])||0)||0;}
 
 /* ── 전일 누적 계산 ──────────────────────────────────────────────
@@ -978,6 +1068,51 @@ function initTop(){
 function onWeekNav(){var v=el('wk-nav').value;if(v){S.ws=getMonday(new Date(v));rWeekly();}}
 function moveWeek(dir){var d=new Date(S.ws);d.setDate(d.getDate()+dir*7);S.ws=d;syncWkNav();rWeekly();}
 function syncWkNav(){var k=fmtDate(S.ws),sel=el('wk-nav');for(var i=0;i<sel.options.length;i++){if(sel.options[i].value===k){sel.selectedIndex=i;break;}}}
+
+
+function toggleAllRows(btn){
+  var types=['fc','pv','max','ac','mis'];
+  var anyOff=types.some(function(t){return !SHOW[t];});
+  types.forEach(function(t){
+    SHOW[t]=anyOff;
+    var id=t==='ac'?'wkp-fin':(t==='max'?'wkp-max':(t==='mis'?'wkp-mis':(t==='pv'?'wkp-pv':'wkp-fc')));
+    var b=document.getElementById(id);
+    if(b){if(anyOff)b.classList.add('on');else b.classList.remove('on');}
+    document.querySelectorAll('tr.r-'+t).forEach(function(r){r.classList.toggle('wk-hide',!SHOW[t]);});
+  });
+  refreshNameVisibility();
+  btn.style.background=anyOff?'#0f172a':'rgba(255,255,255,0.88)';
+  btn.style.color=anyOff?'#fff':'var(--t2)';
+}
+
+function toggleNickFilterPanel(){
+  var body=document.getElementById('nick-filter-body');
+  var icon=document.getElementById('nick-filter-icon');
+  if(!body)return;
+  var open=body.classList.contains('open');
+  body.classList.toggle('open',!open);
+  if(icon) icon.textContent=open?'▾':'▴';
+}
+
+function toggleNick(nick,btn){
+  SHOW_NICKS[nick]=!SHOW_NICKS[nick];
+  btn.classList.toggle('on',SHOW_NICKS[nick]);
+  // 전체 버튼 상태 동기화
+  var allOn=ITEM_NICK.every(function(n){return SHOW_NICKS[n];});
+  var allBtn=document.getElementById('nfb-all');
+  if(allBtn){allBtn.classList.toggle('on',allOn);}
+  rWeekly();
+}
+
+function toggleAllNicks(btn){
+  var anyOff=ITEM_NICK.some(function(n){return !SHOW_NICKS[n];});
+  ITEM_NICK.forEach(function(n){SHOW_NICKS[n]=anyOff;});
+  document.querySelectorAll('.nfb[data-nick]').forEach(function(b){
+    b.classList.toggle('on',anyOff);
+  });
+  btn.classList.toggle('on',anyOff);
+  rWeekly();
+}
 
 function toggleRow(type){
   SHOW[type]=!SHOW[type];
@@ -1096,10 +1231,12 @@ function rWeekly(){
   h+='<tr><th class="h-item" rowspan="2">품목</th><th class="h-lbl" rowspan="2">항목</th>';
   days.forEach(function(d,i){
     var key=fmtDate(d),isT=key===todayK,isW=i>=5;
+    var isTue=(d.getDay()===2);
     var cls=isT?'h-today':(isW?'h-wknd':'');
-    h+='<th class="'+cls+'"><div class="th-day"><div class="th-dn">'+DNs[i]+'</div><div class="th-dd">'+fmtShort(d)+'</div></div></th>';
+    var monCls=isTue?' h-mon-fc':'';
+    h+='<th class="'+cls+monCls+'"><div class="th-day"><div class="th-dn">'+DNs[i]+'</div><div class="th-dd">'+fmtShort(d)+'</div></div></th>';
   });
-  h+='<th class="h-tot" rowspan="2">주합계</th></tr>';
+  h+='<th class="h-tot" rowspan="2">계</th></tr>';
   /* row2: event chips + holiday btn */
   h+='<tr>';
   days.forEach(function(d,i){
@@ -1123,6 +1260,7 @@ function rWeekly(){
   ITEM_GROUPS.forEach(function(g){
     h+='<tr class="grp-row"><td colspan="'+(days.length+3)+'">'+g.label+'</td></tr>';
     g.items.forEach(function(nick){
+      if(!SHOW_NICKS[nick]) return; // 품목 필터
       var rFc=0,rPv=0,rMx=0,rAc=0,rMis=0;
       var fcC='',pvC='',mxC='',acC='',misC='';
       days.forEach(function(d){
@@ -1130,13 +1268,27 @@ function rWeekly(){
         var isW=d.getDay()===0||d.getDay()===6;
         var cc=isT?'col-today ':(isCl?'col-cl ':(isW?'col-wknd ':''));
         var fc=getFc(key,nick),pv=getPv(key,nick),mx=getMx(key,nick),ac=getAc(key,nick),mis=getMis(key,nick);
+        var rawMx=getRawMx(key,nick),rawAc=getAc(key,nick);
         rFc+=fc;rPv+=pv;rMx+=mx;rAc+=ac;rMis+=mis;
         var ec=EDIT_COLS[key]?' editable':'';
+        var isPast=key<todayK, isToday=key===todayK;
+        var isWknd=d.getDay()===0||d.getDay()===6;
+        // 2. 전일: 과거 영업일 중 rawPv 공란
+        var pvWarn=(isPast&&!isWknd&&!isCl&&!getRawPv(key,nick))?' warn-pv':'';
+        // 3. 최대: 오늘 + 과거 영업일 공란
+        var mxWarn=((isToday||isPast)&&!isWknd&&!isCl&&!rawMx)?' warn-mx':'';
+        // 4. 출고: 오늘 + 과거 영업일 공란
+        var acWarn=((isToday||isPast)&&!isWknd&&!isCl&&!rawAc)?' warn-ac':'';
         fcC +='<td class="'+cc+'"><input class="ci'+ec+'"      data-k="'+key+'" data-i="'+nick+'" data-t="fc" type="text" value="'+(fc||'')+'" placeholder="—"></td>';
-        pvC +='<td class="'+cc+'"><input class="ci ci-pv'+ec+'" data-k="'+key+'" data-i="'+nick+'" data-t="pv" type="text" value="'+(pv||'')+'" placeholder="—"></td>';
-        mxC +='<td class="'+cc+'"><input class="ci ci-mx'+ec+'" data-k="'+key+'" data-i="'+nick+'" data-t="mx" type="text" value="'+(mx||'')+'" placeholder="—"></td>';
-        acC +='<td class="'+cc+'"><input class="ci ci-ac'+ec+'" data-k="'+key+'" data-i="'+nick+'" data-t="ac" type="text" value="'+(ac||'')+'" placeholder="—"></td>';
-        misC+='<td class="'+cc+'">'+(mis>0?'<span class="mis-num">'+mis+'</span>':'<span class="dash">—</span>')+'</td>';
+        pvC +='<td class="'+cc+pvWarn+'"><input class="ci ci-pv'+ec+'" data-k="'+key+'" data-i="'+nick+'" data-t="pv" type="text" value="'+(pv||'')+'" placeholder="'+(pvWarn?'⚠️':'—')+'"></td>';
+        mxC +='<td class="'+cc+mxWarn+'"><input class="ci ci-mx'+ec+'" data-k="'+key+'" data-i="'+nick+'" data-t="mx" type="text" value="'+(mx||'')+'" placeholder="'+(mxWarn?'⚠️':'—')+'"></td>';
+        acC +='<td class="'+cc+acWarn+'"><input class="ci ci-ac'+ec+'" data-k="'+key+'" data-i="'+nick+'" data-t="ac" type="text" value="'+(ac||'')+'" placeholder="'+(acWarn?'⚠️':'—')+'"></td>';
+        // 5. 미출: mx·ac 둘 다 있으면 계산, 하나라도 없으면 ⚠️, 0이면 초록 0
+        var misTd;
+        if(!rawMx||!rawAc){ misTd='<span class="mis-unknown">⚠️</span>'; }
+        else if(mis===0){ misTd='<span class="mis-zero">0</span>'; }
+        else{ misTd='<span class="mis-num">'+mis+'</span>'; }
+        misC+='<td class="'+cc+'">'+misTd+'</td>';
       });
       var hFc=SHOW.fc?'':'wk-hide',hPv=SHOW.pv?'':'wk-hide',hMx=SHOW.max?'':'wk-hide',hAc=SHOW.ac?'':'wk-hide',hMs=SHOW.mis?'':'wk-hide';
       var ni='<div class="c-name-inner"><div class="item-full">'+ITEM_FULL[nick]+'</div><div class="item-nick">'+nick+'</div></div>';
@@ -1701,12 +1853,32 @@ function rMonthly(){
       dayMis += getMis(dk,it);
     });
 
+    // 미출 품목 목록
+    var dayMisNicks=[];
+    ITEM_NICK.forEach(function(it){if(getMis(dk,it)>0) dayMisNicks.push(it);});
+
     var numHtml = '<div class="mo-nums">';
-    if(MO_SHOW.fc  && dayFc)  numHtml += '<span class="mo-n mo-n-fc">'+dayFc.toLocaleString()+'</span>';
-    if(MO_SHOW.pv  && dayPv)  numHtml += '<span class="mo-n mo-n-pv">'+dayPv.toLocaleString()+'</span>';
-    if(MO_SHOW.max && dayMax) numHtml += '<span class="mo-n mo-n-max">'+dayMax.toLocaleString()+'</span>';
-    if(MO_SHOW.ac  && dayAc)  numHtml += '<span class="mo-n mo-n-ac">'+dayAc.toLocaleString()+'</span>';
-    if(MO_SHOW.mis && dayMis) numHtml += '<span class="mo-n mo-n-mis">'+dayMis.toLocaleString()+'</span>';
+
+    // 1행: 예측|전일|최대|출고 (가로, 토글 ON인 것만, | 구분)
+    var row1Parts=[];
+    if(MO_SHOW.fc)  row1Parts.push('<span class="mo-v mo-n-fc">'+(dayFc?dayFc.toLocaleString():'—')+'</span>');
+    if(MO_SHOW.pv)  row1Parts.push('<span class="mo-v mo-n-pv">'+(dayPv?dayPv.toLocaleString():'—')+'</span>');
+    if(MO_SHOW.max) row1Parts.push('<span class="mo-v mo-n-max">'+(dayMax?dayMax.toLocaleString():'—')+'</span>');
+    if(MO_SHOW.ac)  row1Parts.push('<span class="mo-v mo-n-ac">'+(dayAc?dayAc.toLocaleString():'—')+'</span>');
+    if(row1Parts.length){
+      numHtml += '<div class="mo-row1">'+row1Parts.join('<span class="mo-sep">|</span>')+'</div>';
+    }
+
+    // 2행: 미출 합계
+    if(MO_SHOW.mis){
+      numHtml += '<div class="mo-row-mis">'+(dayMis>0?'미출 '+dayMis.toLocaleString():(dayMax||dayAc?'<span style="font-size:9px;">0</span>':''))+'</div>';
+    }
+
+    // 3행: 미출 품목 닉네임
+    if(MO_SHOW.mis && dayMisNicks.length){
+      numHtml += '<div class="mo-row-miss-items">'+dayMisNicks.join(' ')+'</div>';
+    }
+
     numHtml += '</div>';
 
     cal += '<div class="'+cls+'" onclick="openDrawer(this.dataset.dk)" data-dk="'+dk+'">';
@@ -1727,6 +1899,8 @@ function rMonthly(){
 
 /* ── 날짜 상세 드로어 ── */
 function openDrawer(dateKey){
+  // 버튼 상태 동기화
+  ['fc','pv','max','ac','mis'].forEach(function(t){var b=document.getElementById('dwr-'+t);if(b)b.classList.toggle('on',DRAWER_SHOW[t]);});
   var d = new Date(dateKey);
   var DOW_KO = ['일','월','화','수','목','금','토'];
   var title = (d.getMonth()+1)+'월 '+d.getDate()+'일('+DOW_KO[d.getDay()]+')';
@@ -1771,6 +1945,23 @@ function openDrawer(dateKey){
   el('mo-drawer-body').innerHTML = body;
   el('mo-drawer').style.display = '';
   el('mo-drawer-overlay').style.display = '';
+}
+
+
+var DRAWER_SHOW={fc:true,pv:true,max:true,ac:true,mis:true};
+function drawerToggle(type){
+  DRAWER_SHOW[type]=!DRAWER_SHOW[type];
+  var btn=document.getElementById('dwr-'+type);
+  if(btn) btn.classList.toggle('on',DRAWER_SHOW[type]);
+  // 드로어 테이블 열 숨기기
+  var colIdx={fc:1,pv:2,max:3,ac:4,mis:5};
+  var idx=colIdx[type];
+  var tbl=document.querySelector('#mo-drawer-body table');
+  if(!tbl) return;
+  tbl.querySelectorAll('tr').forEach(function(row){
+    var cells=row.querySelectorAll('th,td');
+    if(cells[idx]) cells[idx].style.display=DRAWER_SHOW[type]?'':'none';
+  });
 }
 
 function closeDrawer(){
